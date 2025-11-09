@@ -1,360 +1,405 @@
-# Учебное занятие — Длинная арифметика (BigIntegers)
+# Алгоритмы сортировки — методический материал (Markdown для GitHub)
 
-*Материал основан на вашей рабочей тетради.* 
-
-**Цель:** научиться хранить и выполнять базовые операции с целыми числами произвольной длины (сложение, вычитание, умножение, деление), понять идею Карацубы и ускоренное побитовое сложение.
+Материал оформлен на основе рабочей тетради «Алгоритмы — Рабочая тетрадь 4» (семестр 1, 2025–2026). 
 
 ---
 
-## План занятия
+## Содержание
 
-1. Представление больших чисел
-2. Сравнение
-3. Сложение и вычитание (в столбик)
-4. Умножение: школьный алгоритм и Карацуба
-5. Деление (школьный алгоритм)
-6. Ускоренное двоичное сложение (идейно)
-7. Примеры кода и тесты
-8. Задания
-
----
-
-## Формат представления
-
-* В этом уроке `BigInt` представлен как `std::vector<int>` в десятичной системе (база = 10).
-* **LSB-first** — младший разряд (единицы) хранится в `digits[0]`, старший — в конце. Такой порядок удобен для операций с переносом/заимствованием.
+1. [Введение — базовые понятия](#введение---базовые-понятия)
+2. [Таблица сложности и свойства](#таблица-сложности-и-свойства)
+3. [Операция `swap` — пример и измерения (Пример 1)](#операция-swap---пример-и-измерения-пример-1)
+4. [Пузырьковая сортировка (Bubble Sort) — задание 1](#пузырьковая-сортировка-bubble-sort---задание-1)
+5. [Шейкерная сортировка (Cocktail / Shaker) — задание 2*](#шейкерная-сортировка-cocktail--shaker---задание-2)
+6. [Сортировка вставками (Insertion Sort) — задание 3](#сортировка-вставками-insertion-sort---задание-3)
+7. [Сортировка выбором (Selection Sort) — задание 4](#сортировка-выбором-selection-sort---задание-4)
+8. [Сортировка Шелла (Shell Sort) — задание 5*](#сортировка-шелла-shell-sort---задание-5)
+9. [Гномья сортировка (Gnome Sort) — задание 6](#гномья-сортировка-gnome-sort---задание-6)
+10. [Функции + измерения времени (задание 7*)](#функции--измерения-времени-задание-7)
+11. [Бинарная вставка — улучшение Insertion (задание 8*)](#бинарная-вставка----улучшение-insertion-задание-8)
+12. [Как оформить на GitHub / структура репозитория](#как-оформить-на-github--структура-репозитория)
+13. [Примечания и рекомендации для студентов](#примечания-и-рекомендации-для-студентов)
 
 ---
 
-## Полный пример кода (готово для копирования в `main.cpp`)
+# Введение — базовые понятия
+
+**Алгоритм сортировки** — способ упорядочить элементы массива по возрастанию (или убыванию). В практических лабораторных задачах обычно нужно:
+
+* реализовать алгоритм (часто на C++),
+* оформить в виде функции,
+* измерить время выполнения на маленьких и больших массивах,
+* проанализировать сложность.
+
+**Важные свойства алгоритмов:**
+
+* *in-place*: использует O(1) дополнительной памяти (кроме стека и небольших переменных);
+* *стабильность*: остаётся ли относительный порядок равных элементов;
+* число сравнений/перестановок (ключевой ресурс).
+
+---
+
+# Таблица сложности и свойства
+
+| Алгоритм          |                     Среднее время | Худшее время | Память | Стабильность | Примечание                       |
+| ----------------- | --------------------------------: | -----------: | -----: | -----------: | -------------------------------- |
+| Bubble            |                             O(n²) |        O(n²) |   O(1) |           Да | прост и учебен                   |
+| Cocktail (Shaker) |                             O(n²) |        O(n²) |   O(1) |           Да | Bi-directional bubble            |
+| Insertion         |                             O(n²) |        O(n²) |   O(1) |           Да | хорошо для почти отсортированных |
+| Selection         |                             O(n²) |        O(n²) |   O(1) |          Нет | минимизирует число обменов       |
+| Shell             | зависит от последовательности gap |            — |   O(1) |          Нет | намного быстрее на средних n     |
+| Gnome             |                             O(n²) |        O(n²) |   O(1) |           Да | реализация ↔ один цикл (можно)   |
+
+---
+
+# Операция `swap` — пример и измерения (Пример 1)
+
+Ниже — два способа обмена двух элементов: использование `std::swap` и собственная функция `my_swap`. Также пример замера времени.
 
 ```cpp
-// main.cpp
-// Пример реализации операций для больших целых чисел (base = 10).
-// Компиляция: g++ -std=c++17 main.cpp -O2 -o main
-
+// swap_examples.cpp
 #include <iostream>
 #include <vector>
-#include <string>
-#include <algorithm>
-#include <cassert>
-#include <ctime>
-#include <cstdlib>
+#include <algorithm> // std::swap
+#include <chrono>
+#include <random>
 
-using namespace std;
-
-// Тип для больших целых (каждый элемент 0..9, LSB в index 0)
-using BigInt = vector<int>;
-
-// ---------- Утилиты ----------
-void trim(BigInt &a) {
-    // Удалить ведущие нули (старшие разряды)
-    while (a.size() > 1 && a.back() == 0) a.pop_back();
+void my_swap(int &a, int &b) {
+    int t = a;
+    a = b;
+    b = t;
 }
 
-BigInt fromString(const string &s) {
-    // Создать BigInt из строки "12345"
-    BigInt a;
-    for (int i = (int)s.size() - 1; i >= 0; --i) {
-        if (!isdigit(s[i])) continue;
-        a.push_back(s[i] - '0');
-    }
-    if (a.empty()) a.push_back(0);
-    trim(a);
-    return a;
-}
-
-string toString(const BigInt &a) {
-    // Преобразовать BigInt в строку "12345"
-    string s;
-    for (int i = (int)a.size() - 1; i >= 0; --i) s.push_back(char('0' + a[i]));
-    if (s.empty()) return "0";
-    return s;
-}
-
-BigInt randomBigInt(int n) {
-    // Генерация случайного числа длины n (старшая цифра != 0)
-    assert(n >= 1);
-    BigInt a(n);
-    for (int i = 0; i < n; ++i) a[i] = rand() % 10;
-    if (a.back() == 0) a.back() = 1 + (rand() % 9);
-    trim(a);
-    return a;
-}
-
-// ---------- Сравнение ----------
-int compare(const BigInt &a, const BigInt &b) {
-    // Возвращает: 1 если a>b, 0 если a==b, -1 если a<b
-    if (a.size() != b.size()) return a.size() > b.size() ? 1 : -1;
-    for (int i = (int)a.size() - 1; i >= 0; --i)
-        if (a[i] != b[i]) return (a[i] > b[i]) ? 1 : -1;
-    return 0;
-}
-
-// ---------- Сложение ----------
-BigInt add(const BigInt &a, const BigInt &b) {
-    int n = max(a.size(), b.size());
-    BigInt res;
-    res.reserve(n + 1);
-    int carry = 0;
-    for (int i = 0; i < n; ++i) {
-        int da = (i < (int)a.size()) ? a[i] : 0;
-        int db = (i < (int)b.size()) ? b[i] : 0;
-        int sum = da + db + carry;
-        res.push_back(sum % 10);
-        carry = sum / 10;
-    }
-    if (carry) res.push_back(carry);
-    trim(res);
-    return res;
-}
-
-// ---------- Вычитание (a >= b) ----------
-BigInt sub(const BigInt &a, const BigInt &b) {
-    BigInt res;
-    res.reserve(a.size());
-    int borrow = 0;
-    for (int i = 0; i < (int)a.size(); ++i) {
-        int da = a[i];
-        int db = (i < (int)b.size()) ? b[i] : 0;
-        int cur = da - db - borrow;
-        if (cur < 0) { cur += 10; borrow = 1; } else borrow = 0;
-        res.push_back(cur);
-    }
-    trim(res);
-    return res;
-}
-
-// Удобная обёртка: возвращает (результат, знак)
-pair<BigInt,int> subSigned(const BigInt &a, const BigInt &b) {
-    int cmp = compare(a,b);
-    if (cmp == 0) return {BigInt{0}, 0};
-    if (cmp > 0) return {sub(a,b), +1};
-    else return {sub(b,a), -1};
-}
-
-// ---------- Школьное умножение O(n*m) ----------
-BigInt multiplySchoolbook(const BigInt &a, const BigInt &b) {
-    BigInt res(a.size() + b.size(), 0);
-    for (size_t i = 0; i < a.size(); ++i) {
-        int carry = 0;
-        for (size_t j = 0; j < b.size() || carry; ++j) {
-            long long cur = res[i + j] + 1LL * a[i] * (j < b.size() ? b[j] : 0) + carry;
-            res[i + j] = int(cur % 10);
-            carry = int(cur / 10);
+template<typename F>
+long long measure_swap(F swap_func, std::vector<std::pair<int,int>> &pairs, int iterations=1) {
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int it=0; it<iterations; ++it) {
+        for (auto &p : pairs) {
+            int x = p.first;
+            int y = p.second;
+            swap_func(x, y);
+            // prevent optimizer removing code:
+            if (x == -1) std::cout << "";
         }
     }
-    trim(res);
-    return res;
+    auto end = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
 }
 
-// ---------- Вспомогательные для Карацубы ----------
-BigInt shiftDecimal(const BigInt &a, int k) {
-    // Умножение на 10^k — добавляем k нулей перед цифрами (LSB-first)
-    if ((a.size() == 1 && a[0] == 0) || k == 0) return a;
-    BigInt res(k, 0);
-    res.insert(res.end(), a.begin(), a.end());
-    return res;
-}
-
-// ---------- Карацуба (рекурсивно) ----------
-BigInt karatsuba(const BigInt &a, const BigInt &b) {
-    int n = max(a.size(), b.size());
-    if (n <= 32) return multiplySchoolbook(a, b);
-
-    int k = n / 2;
-    BigInt a0(a.begin(), a.begin() + min((int)a.size(), k));
-    BigInt a1 = ( (int)a.size() > k ? BigInt(a.begin() + k, a.end()) : BigInt{0} );
-    BigInt b0(b.begin(), b.begin() + min((int)b.size(), k));
-    BigInt b1 = ( (int)b.size() > k ? BigInt(b.begin() + k, b.end()) : BigInt{0} );
-
-    trim(a0); trim(a1); trim(b0); trim(b1);
-
-    BigInt z0 = karatsuba(a0, b0);
-    BigInt z2 = karatsuba(a1, b1);
-    BigInt sumA = add(a0, a1);
-    BigInt sumB = add(b0, b1);
-    BigInt z1 = karatsuba(sumA, sumB);
-    // z1 = (a0+a1)*(b0+b1) - z2 - z0
-    z1 = sub(sub(z1, z2), z0);
-
-    BigInt res = add(add(shiftDecimal(z2, 2*k), shiftDecimal(z1, k)), z0);
-    trim(res);
-    return res;
-}
-
-// ---------- Умножение на цифру (0..9) ----------
-BigInt mulByDigit(const BigInt &a, int d) {
-    if (d == 0) return BigInt{0};
-    BigInt res;
-    res.reserve(a.size() + 2);
-    int carry = 0;
-    for (size_t i = 0; i < a.size(); ++i) {
-        int cur = a[i] * d + carry;
-        res.push_back(cur % 10);
-        carry = cur / 10;
-    }
-    while (carry) {
-        res.push_back(carry % 10);
-        carry /= 10;
-    }
-    trim(res);
-    return res;
-}
-
-// ---------- Деление (школьный метод) ----------
-// Возвращает (quotient, remainder)
-pair<BigInt, BigInt> divide(const BigInt &a, const BigInt &b) {
-    assert(!(b.size() == 1 && b[0] == 0)); // деление на ноль запрещено
-    if (compare(a,b) < 0) return {BigInt{0}, a};
-
-    BigInt cur; // текущая часть (LSB-first)
-    BigInt quotient;
-    quotient.resize(a.size(), 0);
-
-    for (int i = (int)a.size() - 1; i >= 0; --i) {
-        // сдвигаем cur влево на одну десятичную цифру и добавляем текущую цифру
-        cur.insert(cur.begin(), 0);
-        cur[0] = a[i];
-        trim(cur);
-
-        // ищем максимальную q в [0..9], такой что b*q <= cur
-        int l = 0, r = 9, x = 0;
-        while (l <= r) {
-            int mid = (l + r) >> 1;
-            BigInt prod = mulByDigit(b, mid);
-            if (compare(prod, cur) <= 0) {
-                x = mid;
-                l = mid + 1;
-            } else r = mid - 1;
-        }
-        quotient[i] = x;
-        BigInt prod = mulByDigit(b, x);
-        cur = sub(cur, prod);
-    }
-
-    trim(quotient);
-    trim(cur);
-    return {quotient, cur};
-}
-
-// ---------- Ускоренное двоичное сложение (идея) ----------
-using BitVec = vector<int>; // каждый элемент 0/1, LSB-first
-
-BitVec bitwiseXor(const BitVec &a, const BitVec &b) {
-    int n = max(a.size(), b.size());
-    BitVec r(n,0);
-    for (int i = 0; i < n; ++i) {
-        int da = i < (int)a.size() ? a[i] : 0;
-        int db = i < (int)b.size() ? b[i] : 0;
-        r[i] = da ^ db;
-    }
-    return r;
-}
-BitVec bitwiseAnd(const BitVec &a, const BitVec &b) {
-    int n = max(a.size(), b.size());
-    BitVec r(n,0);
-    for (int i = 0; i < n; ++i) {
-        int da = i < (int)a.size() ? a[i] : 0;
-        int db = i < (int)b.size() ? b[i] : 0;
-        r[i] = da & db;
-    }
-    return r;
-}
-BitVec shiftLeftOne(const BitVec &a) {
-    BitVec r(1,0);
-    r.insert(r.end(), a.begin(), a.end());
-    return r;
-}
-
-BitVec addBinaryAccelerated(BitVec a, BitVec b) {
-    BitVec sum = bitwiseXor(a,b);
-    BitVec carry = shiftLeftOne(bitwiseAnd(a,b));
-    while (true) {
-        bool allZero = true;
-        for (int x : carry) if (x) { allZero = false; break; }
-        if (allZero) break;
-        BitVec tmp = bitwiseXor(sum, carry);
-        BitVec newCarry = shiftLeftOne(bitwiseAnd(sum, carry));
-        sum = tmp;
-        carry = newCarry;
-    }
-    while (sum.size() > 1 && sum.back() == 0) sum.pop_back();
-    return sum;
-}
-
-// ---------- Тесты и демонстрация ----------
 int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-    srand((unsigned)time(nullptr));
+    std::mt19937 rng(123);
+    std::uniform_int_distribution<int> dist(0, 1'000'000);
+    std::vector<std::pair<int,int>> pairs(1'000'00);
+    for (auto &p : pairs) p = {dist(rng), dist(rng)};
 
-    // Пример: ввод двух чисел вручную
-    cout << "Пример: введите два целых числа (в одной строке через пробел):\n";
-    string sa, sb;
-    if (!(cin >> sa >> sb)) return 0;
-    BigInt A = fromString(sa);
-    BigInt B = fromString(sb);
+    auto t1 = measure_swap([](int &a, int &b){ std::swap(a,b); }, pairs, 50);
+    auto t2 = measure_swap([](int &a, int &b){ int tmp=a; a=b; b=tmp; }, pairs, 50);
 
-    cout << "A = " << toString(A) << "\n";
-    cout << "B = " << toString(B) << "\n";
-
-    cout << "A + B = " << toString(add(A,B)) << "\n";
-
-    auto [diff, sign] = subSigned(A,B);
-    cout << "A - B = " << (sign < 0 ? "-" : "") << toString(diff) << "\n";
-
-    cout << "A * B (schoolbook) = " << toString(multiplySchoolbook(A,B)) << "\n";
-    cout << "A * B (karatsuba)   = " << toString(karatsuba(A,B)) << "\n";
-
-    auto [Q,R] = divide(A,B);
-    cout << "A / B = " << toString(Q) << ", remainder = " << toString(R) << "\n";
-
-    // Короткий бинарный пример: 13 + 7
-    BitVec a_bits = {1,0,1,1}; // 13 (1101) LSB-first
-    BitVec b_bits = {1,1,1};   // 7  (111)
-    BitVec s_bits = addBinaryAccelerated(a_bits, b_bits);
-    int val = 0;
-    for (int i = (int)s_bits.size()-1; i >=0; --i) val = val*2 + s_bits[i];
-    cout << "13 + 7 (binary accelerated) = " << val << "\n";
-
+    std::cout << "std::swap: " << t1 << " us\n";
+    std::cout << "my_swap:   " << t2 << " us\n";
     return 0;
+}
+```
+
+**Примечание:** Разница часто минимальна, компилятор может инлайнить `std::swap` или оптимизировать пользовательский код — измеряйте корректно (чтобы не оптимизировалось в пустоту).
+
+---
+
+# Пузырьковая сортировка (Bubble Sort) — задание 1
+
+**Идея:** многократные проходы по массиву, при которых соседние элементы сравниваются и при необходимости меняются местами. После каждого прохода последний элемент — максимальный среди неотсортированных.
+
+**Псевдокод:**
+
+```
+for i = 0 to n-2
+  swapped = false
+  for j = 0 to n-2-i
+    if a[j] > a[j+1] then swap(a[j], a[j+1]); swapped = true
+  if not swapped then break
+```
+
+**C++ реализация:**
+
+```cpp
+void bubble_sort(std::vector<int>& a) {
+    int n = a.size();
+    for (int i = 0; i < n-1; ++i) {
+        bool swapped = false;
+        for (int j = 0; j < n-1-i; ++j) {
+            if (a[j] > a[j+1]) {
+                std::swap(a[j], a[j+1]);
+                swapped = true;
+            }
+        }
+        if (!swapped) break;
+    }
+}
+```
+
+**Пример:**
+Input: `[5, 1, 4, 2, 8]` → Output: `[1,2,4,5,8]`
+
+---
+
+# Шейкерная сортировка (Cocktail / Shaker) — задание 2*
+
+**Идея:** двунаправленный проход — сначала слева направо (как пузырёк), затем справа налево; границы рабочей части сужаются на основе последнего обмена.
+
+**Псевдокод:**
+
+```
+left = 0; right = n-1
+while left < right:
+  last = 0
+  for i = left to right-1:
+    if a[i] > a[i+1]: swap; last = i
+  right = last
+  for i = right downto left+1:
+    if a[i-1] > a[i]: swap; last = i
+  left = last
+```
+
+**C++ реализация:**
+
+```cpp
+void shaker_sort(std::vector<int>& a) {
+    int left = 0, right = (int)a.size() - 1;
+    while (left < right) {
+        int last = 0;
+        for (int i = left; i < right; ++i) {
+            if (a[i] > a[i+1]) { std::swap(a[i], a[i+1]); last = i; }
+        }
+        right = last;
+        for (int i = right; i > left; --i) {
+            if (a[i-1] > a[i]) { std::swap(a[i-1], a[i]); last = i; }
+        }
+        left = last;
+    }
 }
 ```
 
 ---
 
-## Как запустить (на любом компьютере с `g++`)
+# Сортировка вставками (Insertion Sort) — задание 3
 
-1. Создайте файл `main.cpp` и вставьте код.
-2. Компиляция:
+**Идея:** строим отсортированную часть слева; каждый следующий элемент вставляем в нужное место в уже отсортированной части.
 
-```bash
-g++ -std=c++17 main.cpp -O2 -o main
+**Псевдокод:**
+
+```
+for i = 1 to n-1
+  key = a[i]
+  j = i-1
+  while j >= 0 and a[j] > key
+    a[j+1] = a[j]; j = j-1
+  a[j+1] = key
 ```
 
-3. Запуск:
+**C++ реализация:**
 
-```bash
-./main
+```cpp
+void insertion_sort(std::vector<int>& a) {
+    for (int i = 1; i < (int)a.size(); ++i) {
+        int key = a[i];
+        int j = i - 1;
+        while (j >= 0 && a[j] > key) {
+            a[j+1] = a[j];
+            --j;
+        }
+        a[j+1] = key;
+    }
+}
 ```
 
-Программа попросит ввести два целых числа (в одну строку) и покажет результаты операций.
+**Примечание:** годится для почти отсортированных данных.
 
 ---
 
-## Пояснения (важные детали для студентов)
+# Сортировка выбором (Selection Sort) — задание 4
 
-* **`LSB-first`** означает, что вектор хранит число в обратном порядке: `123 -> {3,2,1}`. Это упрощает обработку переноса.
-* Обратите внимание на функцию `trim` — удаление ведущих нулей; без неё сравнения и вывод могут быть некорректны.
-* Для очень больших чисел (тысячи цифр) эффективнее использовать более крупный базис, например `base = 10^4` или `base = 10^9`, где каждый элемент вектора хранит не одну, а несколько цифр — это уменьшит количество операций.
-* **Карацуба** полезна при очень больших длинах (обычно сотни и более цифр). Здесь показана упрощённая рекурсивная реализация, чтобы понять идею (уменьшение числа умножений с 4 до 3 при разбиении).
+**Идея:** на каждой итерации выбираем минимальный элемент в неотсортированной части и ставим его на следующую позицию.
+
+**Псевдокод:**
+
+```
+for i = 0 to n-2
+  min_idx = i
+  for j = i+1 to n-1
+    if a[j] < a[min_idx] then min_idx = j
+  swap(a[i], a[min_idx])
+```
+
+**C++ реализация:**
+
+```cpp
+void selection_sort(std::vector<int>& a) {
+    int n = a.size();
+    for (int i = 0; i < n-1; ++i) {
+        int min_idx = i;
+        for (int j = i+1; j < n; ++j)
+            if (a[j] < a[min_idx]) min_idx = j;
+        std::swap(a[i], a[min_idx]);
+    }
+}
+```
+
+**Примечание:** количество обменов минимальное (≤ n), но сравнений — O(n²). Нестабильна.
 
 ---
 
-## Упражнения (для самостоятельной работы)
+# Сортировка Шелла (Shell Sort) — задание 5*
 
-1. **Базис 10000.** Реализовать `BigInt` в базе `base = 10000` (каждая ячейка хранит 4 цифры) и адаптировать все операции. Сравнить скорость с текущей реализацией (замерить время на больших случайных числах).
-2. **Отрицательные числа.** Добавить поддержку отрицательных чисел (класс `SignedBigInt`) и реализовать сравнение/сложение/умножение с учётом знака.
-3. **Нормализованное деление.** Реализовать нормализованный алгоритм деления по Кнуту и исследовать разницу в скорости на больших числах.
-4. **Тесты.** Написать набор автоматических тестов: генерировать случайные числа, сравнивать результаты операций с эталонными (например, с использованием `std::stoll`/`__int128` для небольших длин) либо с языком, где есть BigInt (Python), чтобы убедиться в корректности.
+**Идея:** улучшение вставки: элементы сравниваются на расстоянии `gap`, затем gap уменьшается, завершается `gap=1` (обычная вставка).
+
+**Простая стратегия gap:** `gap = n/2; while (gap > 0) { ...; gap /= 2; }`
+
+**C++ реализация (простая версия):**
+
+```cpp
+void shell_sort(std::vector<int>& a) {
+    int n = a.size();
+    for (int gap = n/2; gap > 0; gap /= 2) {
+        for (int i = gap; i < n; ++i) {
+            int tmp = a[i];
+            int j = i;
+            while (j >= gap && a[j-gap] > tmp) {
+                a[j] = a[j-gap];
+                j -= gap;
+            }
+            a[j] = tmp;
+        }
+    }
+}
+```
+
+**Примечание:** эффективность сильно зависит от последовательности gap (на практике используют Хиббарда, Седжвика и др.).
+
+---
+
+# Гномья сортировка (Gnome Sort) — задание 6
+
+**Идея:** элемент «шагает» влево до своего места, при нарушении порядка — обмен и шаг назад; иначе шаг вперед. Можно реализовать одним циклом `while` — это условие задания (не более одного цикла).
+
+**Одноцикловая реализация (соответствует требованию «не более одного цикла»):**
+
+```cpp
+void gnome_sort(std::vector<int>& a) {
+    int n = a.size();
+    int i = 1;
+    while (i < n) {
+        if (i == 0 || a[i-1] <= a[i]) {
+            ++i;
+        } else {
+            std::swap(a[i-1], a[i]);
+            --i;
+        }
+    }
+}
+```
+
+**Примечание:** это действительно один цикл `while` — внутри присутствуют только условные переходы и один обмен.
+
+---
+
+# Функции + измерения времени (задание 7*)
+
+**Требование:** оформить алгоритмы 1–6 как функции и измерить время выполнения каждой на одном и том же исходном массиве (для маленького и большого размера).
+
+Рекомендации по измерениям:
+
+* Используйте `std::chrono::high_resolution_clock`.
+* Для честности измеряйте на копиях одного и того же исходного массива (чтобы каждый алгоритм получал одинаковые входные данные).
+* Повторяйте измерение несколько раз и усредняйте (для уменьшения шума).
+* Генерация данных:
+
+  * маленький: `n = 100` — для медленных O(n²) алгоритмов —
+  * большой: `n = 10000` (или меньше, если эти алгоритмы слишком медленные на вашей машине).
+* Для Shell и т.п. можно использовать большие n — они лучше масштабируют.
+
+**Примерный измерительный каркас:**
+
+```cpp
+#include <chrono>
+#include <random>
+#include <iostream>
+#include <vector>
+#include <functional>
+
+long long time_run(std::function<void(std::vector<int>&)> f, std::vector<int> a, int repeats=3) {
+    long long sum = 0;
+    for (int r=0; r<repeats; ++r) {
+        auto copy = a;
+        auto start = std::chrono::high_resolution_clock::now();
+        f(copy);
+        auto end = std::chrono::high_resolution_clock::now();
+        sum += std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+    }
+    return sum / repeats;
+}
+
+int main() {
+    // generate base array
+    std::mt19937 rng(42);
+    std::uniform_int_distribution<int> d(0, 1'000'000);
+    int n_small = 200, n_large = 10000;
+    std::vector<int> small(n_small), large(n_large);
+    for (int &x : small) x = d(rng);
+    for (int &x : large) x = d(rng);
+
+    // e.g. call time_run(bubble_sort, small)
+}
+```
+
+---
+
+# Бинарная вставка — улучшение Insertion (задание 8*)
+
+**Идея:** при вставке элемента в отсортированную часть искать позицию бинарным поиском (O(log n)), но смещение элементов всё ещё O(n), поэтому сложность остаётся O(n²) в целом, но число сравнений уменьшается.
+
+**Псевдокод (для поиска позиции):**
+
+```
+for i = 1..n-1:
+  key = a[i]
+  pos = binary_search_position(a[0..i-1], key)
+  shift a[pos..i-1] right by 1
+  a[pos] = key
+```
+
+**C++ реализация (binary insertion):**
+
+```cpp
+int binary_search_pos(const std::vector<int>& a, int key, int high) {
+    int low = 0;
+    while (low < high) {
+        int mid = (low + high) / 2;
+        if (a[mid] <= key) low = mid + 1;
+        else high = mid;
+    }
+    return low;
+}
+
+void binary_insertion_sort(std::vector<int>& a) {
+    int n = a.size();
+    for (int i = 1; i < n; ++i) {
+        int key = a[i];
+        int pos = binary_search_pos(a, key, i);
+        // shift right
+        for (int j = i; j > pos; --j) a[j] = a[j-1];
+        a[pos] = key;
+    }
+}
+```
+
+**Сравнение:** меньше сравнений — полезно, если сравнения дорогие; но смещения остаются.
+
+
+# Примечания и рекомендации 
+
+* Всегда тестируйте алгоритмы на различных входах: случайных, уже отсортированных, обратном порядке, с большим количеством одинаковых элементов.
+* Для замеров используйте компиляцию с оптимизациями (`-O2`/`-O3`) и фиксированный сид для генератора случайных чисел.
+* Обращайте внимание на стабильность алгоритмов, если сортируете структуры с ключом и связанной информацией.
+* Для больших данных используйте эффективные алгоритмы: `std::sort` (обычно быстрый introsort) или `std::stable_sort` (слияние).
+* Оформляйте код комментариями, поясняющими ключевые шаги алгоритма (особенно там, где логика не тривиальна).
+Скажите, что предпочитаете — дам готовые файлы/архив или вставлю весь набор кодов прямо здесь.
