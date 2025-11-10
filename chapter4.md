@@ -314,6 +314,9 @@ void shaker_sort(std::vector<int>& a) {
 
 **Идея:** строим отсортированную часть слева; каждый следующий элемент вставляем в нужное место в уже отсортированной части.
 
+![image](https://github.com/user-attachments/assets/d4bbdc32-669c-4245-a6b2-159d0bd21301)
+
+
 **Псевдокод:**
 
 ```
@@ -436,7 +439,7 @@ void shell_sort(std::vector<int>& a) {
 
 **Идея:** элемент «шагает» влево до своего места, при нарушении порядка — обмен и шаг назад; иначе шаг вперед. Можно реализовать одним циклом `while` — это условие задания (не более одного цикла).
 
-https://commons.wikimedia.org/wiki/File:Sorting_gnomesort_anim.gif?uselang=ru![image](https://github.com/user-attachments/assets/c43f3b35-480b-431d-9a79-246f5339f510)
+![image](https://github.com/user-attachments/assets/c43f3b35-480b-431d-9a79-246f5339f510)
 
 **Одноцикловая реализация (соответствует требованию «не более одного цикла»):**
 
