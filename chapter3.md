@@ -164,6 +164,20 @@ int compare(const BigInt &a, const BigInt &b) {
 ```
 ---
 
+# Нормализация
+
+Удаление лидирующих нулей (нормализация), возвращает новый count (не меняет указатель)
+
+```cpp
+int normalize_count(const int* num, int count) {
+    if (!num || count <= 0) return 1;
+    while (count > 1 && num[count - 1] == 0) --count;
+    return count;
+}
+```
+
+---
+
 # Сложение
 
 ```cpp
@@ -194,7 +208,7 @@ int* add_numbers(const int* a, int a_count, const int* b, int b_count, int &res_
 
 ---
 
-# Сложение (в столбик)
+# Сложение (усложнение)
 
 Алгоритм: поразрядно суммируем с учётом переноса.
 
@@ -221,7 +235,63 @@ BigInt add(const BigInt &a, const BigInt &b) {
 
 ---
 
-# Вычитание (в столбик)
+# Вычитание (усложнение)
+
+Предполагается: числа представлены little-endian (num[0] — младшая цифра). Зависимость: функция compare_numbers(const int*, int, const int*, int) и normalize_count(const int*, int) (или эквивалент) должны быть доступны.
+
+```cpp
+int* subtract_numbers(const int* a, int a_count, const int* b, int b_count, int &res_count) {
+    // Защита от некорректных входных данных
+    if (!a) { 
+        res_count = 1; 
+        int* r = new int[1]; r[0] = 0; 
+        return r; 
+    }
+    if (!b) { // вычитание нуля
+        res_count = a_count; 
+        int* r = new int[a_count]; 
+        for (int i = 0; i < a_count; ++i) r[i] = a[i];
+        return r;
+    }
+
+    // Сравниваем a и b: если a < b — в этой реализации вернём 0 (можно доработать).
+    int cmp = compare_numbers(a, a_count, b, b_count);
+    if (cmp == 0) { // a == b
+        res_count = 1;
+        int* r = new int[1]; r[0] = 0;
+        return r;
+    } else if (cmp < 0) { // a < b (упрощение)
+        res_count = 1;
+        int* r = new int[1]; r[0] = 0;
+        return r;
+    }
+
+    // Основной цикл вычитания с заимствованиями (borrow).
+    int max_len = max(a_count, b_count);
+    int* res = new int[max_len];
+    int borrow = 0;
+
+    for (int i = 0; i < max_len; ++i) {
+        int da = (i < a_count) ? a[i] : 0;
+        int db = (i < b_count) ? b[i] : 0;
+        int cur = da - db - borrow;
+        if (cur < 0) {
+            cur += 10;    // берем заимствование
+            borrow = 1;
+        } else {
+            borrow = 0;
+        }
+        res[i] = cur;
+    }
+
+    // Удаляем ведущие нули (нормализация длины результата)
+    res_count = normalize_count(res, max_len); 
+    return res;
+}
+```
+---
+
+# Вычитание (усложнение)
 
 Правило: реализуем `a - b`, предполагая `a >= b`. Если возможно `a < b`, сначала сравнить и поменять местами, сохранив знак.
 
@@ -261,7 +331,36 @@ pair<BigInt, int> subSigned(const BigInt &a, const BigInt &b) {
 
 ---
 
-# Умножение «в столбик» (наивное, O(n*m))
+# Умножение «в столбик» 
+```cpp
+int* multiply_numbers(const int* a, int a_count, const int* b, int b_count, int &res_count) {
+    if (!a || !b) { res_count = 1; int* r = new int[1]; r[0]=0; return r; }
+    a_count = normalize_count(a, a_count);
+    b_count = normalize_count(b, b_count);
+    if (a_count == 1 && a[0] == 0) { res_count = 1; int* r = new int[1]; r[0]=0; return r; }
+    if (b_count == 1 && b[0] == 0) { res_count = 1; int* r = new int[1]; r[0]=0; return r; }
+
+    int n = a_count + b_count;
+    int* res = new int[n];
+    for (int i = 0; i < n; ++i) res[i] = 0;
+
+    for (int i = 0; i < a_count; ++i) {
+        int carry = 0;
+        for (int j = 0; j < b_count || carry; ++j) {
+            int db = (j < b_count) ? b[j] : 0;
+            long long cur = res[i+j] + (long long)a[i] * db + carry;
+            res[i+j] = int(cur % 10);
+            carry = int(cur / 10);
+        }
+    }
+
+    res_count = normalize_count(res, n);
+    return res;
+}
+```
+---
+
+# Умножение «в столбик» (усложнение)
 
 ```cpp
 BigInt multiplySchoolbook(const BigInt &a, const BigInt &b) {
@@ -283,7 +382,7 @@ BigInt multiplySchoolbook(const BigInt &a, const BigInt &b) {
 
 ---
 
-# Метод Карацубы (рекурсивно)
+# Метод Карацубы (рекурсивно усложнение)
 
 Идея: для двух чисел разбиваем на старшую и младшую половины:
 `A = a*x + b`, `B = c*x + d`, где `x = 10^k`. Тогда
@@ -337,7 +436,131 @@ BigInt karatsuba(const BigInt &a, const BigInt &b) {
 
 ---
 
-# Деление (школьный способ) — частное + остаток
+# Деление  
+
+Деление (длинное): возвращает частное; остаток через параметр remainder (выделяется внутри). Алгоритм работает с представлением чисел как вектора цифр в старшем-первом (big-endian) для удобства.
+
+```cpp
+static vector<int> to_big(const int* num, int count) {
+    vector<int> v;
+    if (!num || count <= 0) { v.push_back(0); return v; }
+    for (int i = count - 1; i >= 0; --i) v.push_back(num[i]);
+    // убрать лидирующие нули
+    while (v.size() > 1 && v[0] == 0) v.erase(v.begin());
+    return v;
+}
+static int cmp_big(const vector<int> &A, const vector<int> &B) {
+    if (A.size() > B.size()) return 1;
+    if (A.size() < B.size()) return -1;
+    for (size_t i = 0; i < A.size(); ++i) {
+        if (A[i] > B[i]) return 1;
+        if (A[i] < B[i]) return -1;
+    }
+    return 0;
+}
+static vector<int> sub_big(const vector<int> &A, const vector<int> &B) {
+    // A >= B, big-endian
+    vector<int> a = A;
+    int ai = (int)a.size() - 1;
+    int bi = (int)B.size() - 1;
+    int borrow = 0;
+    for (int ia = (int)a.size()-1, ib = (int)B.size()-1; ia >= 0; --ia, --ib) {
+        int db = (ib >= 0) ? B[ib] : 0;
+        int cur = a[ia] - db - borrow;
+        if (cur < 0) { cur += 10; borrow = 1; } else borrow = 0;
+        a[ia] = cur;
+    }
+    // убрать лидирующие нули
+    while (a.size() > 1 && a[0] == 0) a.erase(a.begin());
+    return a;
+}
+static vector<int> mul_big_digit(const vector<int> &A, int d) {
+    if (d == 0) return vector<int>{0};
+    vector<int> res(A.size()+1, 0);
+    int carry = 0;
+    for (int i = (int)A.size()-1, j = (int)res.size()-1; i>=0; --i, --j) {
+        int cur = A[i]*d + carry;
+        res[j] = cur % 10;
+        carry = cur / 10;
+    }
+    res[0] = carry;
+    while (res.size() > 1 && res[0] == 0) res.erase(res.begin());
+    return res;
+}
+
+int* divide_numbers(const int* a, int a_count, const int* b, int b_count, int &quot_count, int* &remainder, int &rem_count) {
+    // Обработка деления на 0
+    if (!b || b_count <= 0 || (b_count==1 && b[0]==0)) {
+        quot_count = 0;
+        remainder = nullptr;
+        rem_count = 0;
+        return nullptr; // деление на ноль — некорректно
+    }
+    // конвертируем в big-endian вектора
+    vector<int> A = to_big(a, a_count);
+    vector<int> B = to_big(b, b_count);
+    if (cmp_big(A, B) < 0) {
+        // частное = 0, остаток = A
+        quot_count = 1;
+        int* q = new int[1]; q[0]=0;
+        // remainder -- вернуть A в little-endian
+        rem_count = (int)A.size();
+        remainder = new int[rem_count];
+        for (int i = 0; i < rem_count; ++i) remainder[i] = A[rem_count-1-i];
+        return q;
+    }
+
+    vector<int> cur; // текущее "остаточное" значение (big-endian)
+    vector<int> quotient_digits; // будут в big-endian
+    for (size_t i = 0; i < A.size(); ++i) {
+        // добавить следующую цифру
+        cur.push_back(A[i]);
+        // убрать ведущие нули
+        while (cur.size() > 1 && cur[0] == 0) cur.erase(cur.begin());
+
+        // найти максимальную цифру x от 0 до 9, такую что B * x <= cur
+        int x_low = 0, x_high = 9, best = 0;
+        while (x_low <= x_high) {
+            int mid = (x_low + x_high) / 2;
+            vector<int> prod = mul_big_digit(B, mid);
+            int cmp = cmp_big(prod, cur);
+            if (cmp <= 0) { best = mid; x_low = mid + 1; }
+            else x_high = mid - 1;
+        }
+        quotient_digits.push_back(best);
+        if (best != 0) {
+            vector<int> prod = mul_big_digit(B, best);
+            cur = sub_big(cur, prod);
+        }
+        // если cur == 0, оставляем {0} или пустой - корректируем позже
+        if (cur.size() == 0) cur.push_back(0);
+    }
+
+    // Удалим лидирующие нули в частном
+    while (quotient_digits.size() > 1 && quotient_digits[0] == 0) quotient_digits.erase(quotient_digits.begin());
+
+    // Сконвертируем частное в little-endian int*
+    quot_count = (int)quotient_digits.size();
+    int* q = new int[quot_count];
+    for (int i = 0; i < quot_count; ++i) q[i] = quotient_digits[quot_count - 1 - i];
+
+    // остаток cur -> little-endian
+    while (cur.size() > 1 && cur[0] == 0) cur.erase(cur.begin());
+    rem_count = (int)cur.size();
+    remainder = new int[rem_count];
+    for (int i = 0; i < rem_count; ++i) remainder[i] = cur[rem_count - 1 - i];
+
+    // Нормализация размеров
+    quot_count = normalize_count(q, quot_count);
+    rem_count = normalize_count(remainder, rem_count);
+
+    return q;
+}
+```
+
+---
+
+# Деление  — частное + остаток
 
 Алгоритм похож на деление в столбик: идём от старшего разряда, постепенно формируем `cur` и находим сколько раз делитель умещается в `cur`. Реализуем деление `A / B`.
 
@@ -512,7 +735,7 @@ int main() {
 
 ---
 
-# Пояснения и учебные советы
+# Пояснения 
 
 * Всегда поддерживайте *trim* (удаление ведущих нулей), иначе сравнения и другие операции станут некорректными.
 * Для реальной эффективности используйте основание `base = 10^k` (например `k=4` или `k=9`) — тогда каждый элемент массива хранит не одну, а `k` цифр, и умножение/сложение выполняется быстрее (меньше отдельных операций).
