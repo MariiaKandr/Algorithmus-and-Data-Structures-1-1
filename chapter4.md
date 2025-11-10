@@ -147,8 +147,8 @@ void my_swap(int& x, int& y) { // Собственная функция swap()
 
 int main() {
     setlocale(LC_ALL, "Russian");
-    srand((unsigned)time(NULL));        // Для генератора случайных чис
-    // srand((unsigned)rand());         // в скриншоте была вторая srand, но она не нужна
+    srand(static_cast<unsigned int>(time(NULL)));        // Для генератора случайных чисел
+    // srand((unsigned)rand());         // в примере представлена вторая srand, но она не нужна
 
     int count = 0; // Переменная для хранения размера массива
     cout << "Введите размер массива (больше 10): ";
