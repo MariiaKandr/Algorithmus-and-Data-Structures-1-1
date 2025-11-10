@@ -208,7 +208,9 @@ int main() {
 # Пузырьковая сортировка (Bubble Sort)
 
 **Идея:** многократные проходы по массиву, при которых соседние элементы сравниваются и при необходимости меняются местами. После каждого прохода последний элемент — максимальный среди неотсортированных.
-https://buffy.mlpforums.com/monthly_2018_06/A3B13C7D-A3F7-4426-871A-600E4B9C551E.gif.f963ef5f72d494133a1f9aa037897850.gif![image](https://github.com/user-attachments/assets/b70deb9c-9d24-463e-89bf-f2c185bc4005)
+
+![bubble sort gif](http://gifimage.net/wp-content/uploads/2017/10/bubble-sort-gif-9.gif)
+![image](https://github.com/user-attachments/assets/b70deb9c-9d24-463e-89bf-f2c185bc4005)
 
 **Асимптотика:**
 
