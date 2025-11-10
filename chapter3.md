@@ -15,7 +15,69 @@
 
 ---
 
-# Примеры кода (C++). Общие утилиты
+# Общие утилиты (основной уровень)
+
+```cpp
+#include <iostream>
+#include <cstdlib>   // rand(), srand()
+#include <ctime>     // time()
+#include <clocale>  
+
+using namespace std;
+
+// Генерация длинного числа
+int* create_random_number(int count) {
+    if (count <= 0) return nullptr;
+    int* num = new int[count];
+
+    if (count == 1) {
+        num[0] = rand() % 10;
+    } else {
+        for (int i = 0; i < count - 1; ++i)
+            num[i] = rand() % 10;
+
+        int hnum;
+        do { hnum = rand() % 10; } while (hnum == 0);
+        num[count - 1] = hnum;
+    }
+    return num;
+}
+
+// Вывод длинного числа
+void print_number(const int* num, int count) {
+    if (!num || count <= 0) {
+        cout << "0";
+        return;
+    }
+    for (int i = count - 1; i >= 0; --i)
+        cout << num[i];
+}
+
+//Основная программа
+int main() {
+    srand(static_cast<unsigned int>(time(nullptr)));
+
+    int count1;
+    cout << "Введите количество цифр для первого числа: ";
+    cin >> count1;
+
+    int* num1 = create_random_number(count1);
+
+    cout << "Первое число: ";
+    print_number(num1, count1);
+    cout << '\n';
+    
+    // Джентельменское правило - удаляем все созданные массивы
+    delete[] num1;
+    num1=nullptr;
+
+    return 0;
+}
+```
+
+---
+
+# Общие утилиты (с усложнением)
 
 ```cpp
 // big_integer_helpers.cpp — базовые утилиты
@@ -66,6 +128,23 @@ BigInt randomBigInt(int n) {
 
 # Сравнение двух больших чисел
 
+```cpp
+// Сравнение чисел (возвращает 1 если a>b, 0 если равны, -1 если a<b)
+int compare_numbers(const int* a, int a_count, const int* b, int b_count) {
+    if (a_count > b_count) return 1;
+    if (a_count < b_count) return -1;
+    for (int i = a_count - 1; i >= 0; --i) {
+        if (a[i] > b[i]) return 1;
+        if (a[i] < b[i]) return -1;
+    }
+    return 0;
+}
+```
+
+---
+
+# Сравнение двух больших чисел (усложнение) 
+
 Правило: сначала по длине, затем по старшим разрядам.
 
 ```cpp
@@ -82,6 +161,35 @@ int compare(const BigInt &a, const BigInt &b) {
 // BigInt x = fromString("12345");
 // BigInt y = fromString("543");
 // int c = compare(x,y); // c == 1
+```
+---
+
+# Сложение
+
+```cpp
+// Функция для сложения
+int* add_numbers(const int* a, int a_count, const int* b, int b_count, int &res_count) {
+    int max_len = max(a_count, b_count);
+    int* res = new int[max_len + 1];
+    int carry = 0;
+
+    for (int i = 0; i < max_len; ++i) {
+        int da = (i < a_count) ? a[i] : 0;
+        int db = (i < b_count) ? b[i] : 0;
+        int sum = da + db + carry;
+        res[i] = sum % 10;
+        carry = sum / 10;
+    }
+
+    if (carry) {
+        res[max_len] = carry;
+        res_count = max_len + 1;
+    } else {
+        res_count = max_len;
+    }
+
+    return res;
+}
 ```
 
 ---
